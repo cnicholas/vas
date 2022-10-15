@@ -10,13 +10,14 @@ vasApp <- function(...) {
       sidebarPanel(
 
         fileInput("datafile",label = "Select a file to analyze", accept = c(".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
+        tableOutput("datafilestats"),
         selectInput("variable_response",label = "Response Variable (y):", choices=NULL),
         selectInput("variable_rsg",label = "RSG Variables (x):", choices=NULL, multiple = TRUE),
 
       ),
       mainPanel(
         tabsetPanel(id="tabset",
-                    tabPanel("data_tab",
+                    tabPanel("data_tab",title = "Data",
                              tableOutput("dataSummary")),
                     tabPanel("Summary Statistics"),
                     tabPanel("Charts",
@@ -43,13 +44,13 @@ vasApp <- function(...) {
       loadDataSet(inputFile$datapath)
 
     })
-
+    output$datafilestats<-renderTable(dataset()%>%summarize(Observations=n(), Variables=ncol(.), "Missing Values"=sum(is.na(.))))
     observeEvent(input$datafile, {
       message("in input_file ObserveEvent")
       req(dataset())
       message(paste("Column names are: ",names(dataset())))
-      response_choices <- dplyr::select_if(dataset(), is.numeric)
-      updateSelectInput(session, "variable_response", choices = colnames(response_choices), selected='') #set selected to '' to avoid triggering observee
+      response_choices <- names(dplyr::select_if(dataset(), is.numeric))
+      updateSelectInput(session, "variable_response", choices = response_choices, selected='') #set selected to '' to avoid triggering observe
     })
 
     observeEvent(input$variable_response, {
