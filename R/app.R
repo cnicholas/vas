@@ -1,17 +1,30 @@
 library(shiny)
 library(readxl)
 library(purrr)
+library(stringr)
 
 vasApp <- function(...) {
   ui <- fluidPage(
     titlePanel("Variation Analysis System"),
     sidebarLayout(
       sidebarPanel(
+
         fileInput("datafile",label = "Select a file to analyze", accept = c(".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
-        tableOutput("dataSummary"),
-     ),
-      mainPanel(textOutput("greeting"),
-                textOutput("chars"))
+        selectInput("variable_response",label = "Response Variable (y):", choices=NULL),
+        selectInput("variable_rsg",label = "RSG Variables (x):", choices=NULL, multiple = TRUE),
+
+      ),
+      mainPanel(
+        tabsetPanel(id="tabset",
+                    tabPanel("data_tab",
+                             tableOutput("dataSummary")),
+                    tabPanel("Summary Statistics"),
+                    tabPanel("Charts",
+                             textOutput("greeting"),
+                             textOutput("chars")
+                    )
+        )
+      )
     )
   )
 
@@ -20,10 +33,10 @@ vasApp <- function(...) {
     loadDataSet<- function(path){
       readxl::read_xlsx(path,sheet="data")
     }
+
     dataset<-reactive({
 
-      if(is.null(input$datafile))
-         return(NULL)
+      req(input$datafile)
 
       inputFile<-input$datafile
 
@@ -31,25 +44,27 @@ vasApp <- function(...) {
 
     })
 
-    output$dataSummary<-renderTable(input$datafile)
+    observeEvent(input$datafile, {
+      message("in input_file ObserveEvent")
+      req(dataset())
+      message(paste("Column names are: ",names(dataset())))
+      response_choices <- dplyr::select_if(dataset(), is.numeric)
+      updateSelectInput(session, "variable_response", choices = colnames(response_choices), selected='') #set selected to '' to avoid triggering observee
+    })
 
-    greeting <- reactive({
-      paste0("Hello ", input$name, "!")
-    })
-    num_chars <- reactive({
-      nchar(input$name)
+    observeEvent(input$variable_response, {
+      if(input$variable_response !='')
+        message(paste("Observing variable_response changes: ", input$variable_response))
+
+        unselected_variables<- !stringr::str_detect(names(dataset()),input$variable_response)
+        message(unselected_variables)
+        rsg_variable_choices<-names(dataset()[unselected_variables])
+        message(rsg_variable_choices)
+        updateSelectInput(session, "variable_rsg", choices = rsg_variable_choices, selected='')
     })
 
-    output$greeting <- renderText({
-      greeting()
-    })
-    output$chars <- renderText({
-      paste("There are:",
-            num_chars() ,
-            "characters in",
-            input$name,
-            collapse = " ")
-    })
+    output$dataSummary<-renderTable(dataset())
+
   }
   shinyApp(ui, server, ...)
 }
