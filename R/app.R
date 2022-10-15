@@ -12,6 +12,7 @@ vasApp <- function(...) {
         fileInput("datafile",label = "Select a file to analyze", accept = c(".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
         tableOutput("datafilestats"),
         selectInput("variable_response",label = "Response Variable (y):", choices=NULL),
+        selectInput("variable_time",label = "Time Dimension (t):", choices=NULL),
         selectInput("variable_rsg",label = "RSG Variables (x):", choices=NULL, multiple = TRUE),
 
       ),
@@ -52,16 +53,27 @@ vasApp <- function(...) {
       response_choices <- names(dplyr::select_if(dataset(), is.numeric))
       updateSelectInput(session, "variable_response", choices = response_choices, selected='') #set selected to '' to avoid triggering observe
     })
-
+#GET Analysis structure defined
     observeEvent(input$variable_response, {
       if(input$variable_response !='')
         message(paste("Observing variable_response changes: ", input$variable_response))
-
         unselected_variables<- !stringr::str_detect(names(dataset()),input$variable_response)
         message(unselected_variables)
-        rsg_variable_choices<-names(dataset()[unselected_variables])
-        message(rsg_variable_choices)
-        updateSelectInput(session, "variable_rsg", choices = rsg_variable_choices, selected='')
+        time_variable_choices<-names(dataset()[unselected_variables])
+        message(time_variable_choices)
+        updateSelectInput(session, "variable_time", choices = time_variable_choices, selected='')
+        updateSelectInput(session, "variable_rsg", choices = time_variable_choices, selected='')
+    })
+    observeEvent(input$variable_time, {
+      if(input$variable_time !='')
+        message(paste("Observing variable_time changes: ", input$variable_time))
+      #filter remaining variable by y and t to populate options for rsg variables
+      unselected_variables<- !names(dataset())%in%c(input$variable_response, input$variable_time)
+      message(unselected_variables)
+
+      rsg_variable_choices<-names(dataset()[unselected_variables])
+      message(rsg_variable_choices)
+      updateSelectInput(session, "variable_rsg", choices = rsg_variable_choices, selected='')
     })
 
     output$dataSummary<-renderTable(dataset())
