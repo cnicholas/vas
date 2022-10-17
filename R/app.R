@@ -99,9 +99,15 @@ vasApp <- function(...) {
         return(NULL)
       req(dataset())
       message(paste("in actionbutton: ",input$analyze))
-      dots<-lapply(input$variable_rsg, as.symbol)
-      message(typeof(dots))
-      dataset() %>% group_by_at(.vars=input$variable_rsg) %>%
+      #need to create list of symbols to do dynamic calculations
+      rsg_def <- lapply(input$variable_rsg, as.symbol)
+
+      rsg_col_name <-paste0(input$variable_rsg,collapse="_")
+      message(paste0("rsg col name: ",rsg_col_name))
+      #fill_weights%>%mutate(!!var:=paste0(!!!cols))%>%head()
+      dataset() %>% mutate(!!rsg_col_name := paste(!!!rsg_def, sep="_")) %>%
+                             #group_by_at(.vars=input$variable_rsg) %>%
+                             group_by(!!sym(rsg_col_name)) %>%
         summarize("Mean (y)" = mean(!!sym(input$variable_response), na.rm=TRUE),
                   "sd (y)" = sd(!!sym(input$variable_response), na.rm=TRUE),
                   "Missing Values"=sum(is.na(!!sym(input$variable_response))))
