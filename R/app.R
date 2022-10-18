@@ -4,6 +4,8 @@ library(dplyr)
 library(purrr)
 library(stringr)
 library(shinyFeedback)
+library(TTR)
+
 
 vasApp <- function(...) {
   ui <- fluidPage(
@@ -35,8 +37,10 @@ vasApp <- function(...) {
                     ),
                     tabPanel(value="tab_data_stats", title="Summary Statistics"),
                     tabPanel(value="tab_charts",title="Charts",
-                             textOutput("greeting"),
-                             textOutput("chars")
+                             selectInput("histogram_filter",label= "Filter",choices=NULL, multiple=FALSE),
+                             plotOutput("greeting"),
+                             textOutput("stuff"),
+
                     )
         )
       )
@@ -103,41 +107,66 @@ vasApp <- function(...) {
       req(dataset(),input$variable_rsg,input$variable_response,input$variable_time)
       message(paste("in actionbutton: ",input$analyze))
 
-      #need to create list of symbols to do dynamic calculations
-      rsg_def <- lapply(input$variable_rsg, as.symbol)
+      #need to create symbols to do dynamic calculations
+      #rsg is a list
+      rsg_def_symbol <- lapply(input$variable_rsg, as.symbol)
+      rsg_col_name <-paste0(input$variable_rsg,collapse="_") #for mutate label
+      rsg_col_name_symbol<-sym(rsg_col_name)
+      input_response_symbol<-sym(input$variable_response)
+      input_time_symbol<- sym(input$variable_time)
 
-      rsg_col_name <-paste0(input$variable_rsg,collapse="_")
       message(paste0("rsg col name: ",rsg_col_name))
       #fill_weights%>%mutate(!!var:=paste0(!!!cols))%>%head()
 
       #Return a list of data frames 1 for summary and 1 with added columns
       #Build Rational Subgroup Fullset with RSG column
-      full <-dataset() %>%  mutate(!!rsg_col_name := paste(!!!rsg_def, sep="_")) %>%
-        filter(is.na(!!sym(input$variable_response))==FALSE) %>%
-        arrange(!!sym(rsg_col_name), !!sym(input$variable_time)) %>%
-        select(!!sym(rsg_col_name),!!sym(input$variable_time),!!sym(input$variable_response), everything())
+      full <-dataset() %>%  mutate(!!rsg_col_name := paste(!!!rsg_def_symbol, sep="_")) %>%
+        filter(is.na(!!input_response_symbol)==FALSE) %>%
+        arrange(!!rsg_col_name_symbol, !!input_time_symbol) %>%
+        select(!!rsg_col_name_symbol,!!input_time_symbol,!!input_response_symbol, everything())
 
       message(nrow(full))
       #Build Rational Subgroup Summary
       summary<-dataset() %>%
-                mutate(!!rsg_col_name := paste(!!!rsg_def, sep="_")) %>%
-                group_by(!!sym(rsg_col_name)) %>%
+                mutate(!!rsg_col_name := paste(!!!rsg_def_symbol, sep="_")) %>%
+                group_by(!!rsg_col_name_symbol) %>%
                 summarize(n=n(),
-                  "Mean (y)" = mean(!!sym(input$variable_response), na.rm=TRUE),
-                  "sd (y)" = sd(!!sym(input$variable_response), na.rm=TRUE),
-                  "Missing Values"=sum(is.na(!!sym(input$variable_response))))
+                  "Mean (y)" = mean(!!input_response_symbol, na.rm=TRUE),
+                  "sd (y)" = sd(!!input_response_symbol, na.rm=TRUE),
+                  "Missing Values"=sum(is.na(!!input_response_symbol)))
 
       list(summary=summary, full=full)
     })
+
+    observeEvent(input$histogram_filter,{
+      if(input$histogram_filter!='')
+        message(paste("filter value: ", input$histogram_filter))
+
+
+    })
+
+    histogramServer<- reactive({
+
+      req(rsgs_info()$full)
+
+      data<-rsgs_info()$full
+      rsg_col_name <-paste0(input$variable_rsg,collapse="_") #for mutate label
+      choices<-data %>% distinct(!!sym(rsg_col_name))
+      updateSelectInput(session, "histogram_filter", choices = choices, selected='')
+      "processed"
+
+    })
+
     disclaimer_msg<-reactive({
       req(rsgs_info())
       if(sum(rsgs_info()$summary$"Missing Values")>0)
         "Note: Missing values removed for calculation of the mean and standard deviation!"
     })
-    output$rsg_stats<-renderTable(rsgs_info()$summary)
-    output$dataSummary<-renderDataTable(dataset())
-    output$disclaimer<-renderText(disclaimer_msg())
-    output$rsg_full<- renderDataTable(rsgs_info()$full)
+    output$rsg_stats <- renderTable(rsgs_info()$summary)
+    output$dataSummary <- renderDataTable(dataset())
+    output$disclaimer <- renderText(disclaimer_msg())
+    output$rsg_full <- renderDataTable(rsgs_info()$full)
+    output$stuff <- renderText(histogramServer())
   }
   shinyApp(ui, server, ...)
 }
