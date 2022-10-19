@@ -37,8 +37,9 @@ vasApp <- function(...) {
                     ),
                     tabPanel(value="tab_data_stats", title="Summary Statistics"),
                     tabPanel(value="tab_charts",title="Charts",
-                             selectInput("histogram_filter",label= "Filter",choices=NULL, multiple=FALSE),
-                             plotOutput("greeting"),
+                             selectInput("histogram_filter",label= "Rational Subgroup:",choices=NULL, multiple=FALSE),
+                             numericInput("bins", "Bins",25, min=1),
+                             plotOutput("hist"),
                              textOutput("stuff"),
 
                     )
@@ -48,10 +49,6 @@ vasApp <- function(...) {
   )
 
   server <- function(input, output, session) {
-
-    loadDataSet<- function(path){
-      readxl::read_xlsx(path,sheet="data")
-    }
 
     dataset<-reactive({
 
@@ -100,7 +97,7 @@ vasApp <- function(...) {
     })
 
 
-    rsgs_info<- reactive({
+    rsg_data<- reactive({
       if(input$analyze==0)
         return(NULL)
 
@@ -109,33 +106,31 @@ vasApp <- function(...) {
 
       #need to create symbols to do dynamic calculations
       #rsg is a list
-      rsg_def_symbol <- lapply(input$variable_rsg, as.symbol)
-      rsg_col_name <-paste0(input$variable_rsg,collapse="_") #for mutate label
-      rsg_col_name_symbol<-sym(rsg_col_name)
-      input_response_symbol<-sym(input$variable_response)
-      input_time_symbol<- sym(input$variable_time)
-
-      message(paste0("rsg col name: ",rsg_col_name))
-      #fill_weights%>%mutate(!!var:=paste0(!!!cols))%>%head()
+      rsg_col_symbols <- lapply(input$variable_rsg, as.symbol) #need for creating rsg column
+      rsg_name <-paste0(input$variable_rsg,collapse="_") #for mutate label
+      rsg_name_symbol<-sym(rsg_name)
+      response_symbol<-sym(input$variable_response)
+      time_symbol<- sym(input$variable_time)
+      #create a list of meta data about analysis structure to use throughout the app
+      rsg_meta<-mget(c("rsg_col_symbols","rsg_name","rsg_name_symbol","response_symbol","time_symbol"))
 
       #Return a list of data frames 1 for summary and 1 with added columns
       #Build Rational Subgroup Fullset with RSG column
-      full <-dataset() %>%  mutate(!!rsg_col_name := paste(!!!rsg_def_symbol, sep="_")) %>%
-        filter(is.na(!!input_response_symbol)==FALSE) %>%
-        arrange(!!rsg_col_name_symbol, !!input_time_symbol) %>%
-        select(!!rsg_col_name_symbol,!!input_time_symbol,!!input_response_symbol, everything())
+      full <-dataset() %>%  mutate(!!rsg_name := paste(!!!rsg_col_symbols, sep="_")) %>%
+        filter(is.na(!!response_symbol)==FALSE) %>%
+        arrange(!!rsg_name_symbol, !!time_symbol) %>%
+        select(!!rsg_name_symbol,!!time_symbol,!!response_symbol, everything())
 
-      message(nrow(full))
       #Build Rational Subgroup Summary
       summary<-dataset() %>%
-                mutate(!!rsg_col_name := paste(!!!rsg_def_symbol, sep="_")) %>%
-                group_by(!!rsg_col_name_symbol) %>%
+                mutate(!!rsg_name := paste(!!!rsg_col_symbols, sep="_")) %>%
+                group_by(!!rsg_name_symbol) %>%
                 summarize(n=n(),
-                  "Mean (y)" = mean(!!input_response_symbol, na.rm=TRUE),
-                  "sd (y)" = sd(!!input_response_symbol, na.rm=TRUE),
-                  "Missing Values"=sum(is.na(!!input_response_symbol)))
+                  "Mean (y)" = mean(!!response_symbol, na.rm=TRUE),
+                  "sd (y)" = sd(!!response_symbol, na.rm=TRUE),
+                  "Missing Values"=sum(is.na(!!response_symbol)))
 
-      list(summary=summary, full=full)
+      list(summary=summary, full=full, meta=rsg_meta)
     })
 
     observeEvent(input$histogram_filter,{
@@ -146,27 +141,48 @@ vasApp <- function(...) {
     })
 
     histogramServer<- reactive({
+      message("histogramServer")
+      req(rsg_data()$full)
 
-      req(rsgs_info()$full)
+      data<-rsg_data()$full
+      choices<-data %>% distinct(!!rsg_data()$meta$rsg_name_symbol)
+      choices<-c("All",choices)
+      updateSelectInput(session, "histogram_filter", choices = choices, selected='All')
 
-      data<-rsgs_info()$full
-      rsg_col_name <-paste0(input$variable_rsg,collapse="_") #for mutate label
-      choices<-data %>% distinct(!!sym(rsg_col_name))
-      updateSelectInput(session, "histogram_filter", choices = choices, selected='')
-      "processed"
-
+      ""
+    })
+    hist_data <- reactive({
+      req(rsg_data()$full)
+      data <- rsg_data()$full
+      message(typeof(data))
+      response_sym <- sym(input$variable_response)
+      if (input$histogram_filter == 'All') {
+        result <- data %>% select(!!rsg_data()$meta$response_symbol)
+        return(result[[1]])
+      } else{
+        result <-
+          data %>% filter(!!rsg_data()$meta$rsg_name_symbol == input$histogram_filter) %>%
+          select(!!rsg_data()$meta$response_symbol)
+        return(result[[1]])
+      }
     })
 
     disclaimer_msg<-reactive({
-      req(rsgs_info())
-      if(sum(rsgs_info()$summary$"Missing Values")>0)
+      req(rsg_data())
+      if(sum(rsg_data()$summary$"Missing Values")>0)
         "Note: Missing values removed for calculation of the mean and standard deviation!"
     })
-    output$rsg_stats <- renderTable(rsgs_info()$summary)
+    output$rsg_stats <- renderTable(rsg_data()$summary)
     output$dataSummary <- renderDataTable(dataset())
     output$disclaimer <- renderText(disclaimer_msg())
-    output$rsg_full <- renderDataTable(rsgs_info()$full)
+    output$rsg_full <- renderDataTable(rsg_data()$full)
     output$stuff <- renderText(histogramServer())
+    output$hist <- renderPlot({
+      req(input$histogram_filter)
+      message("in render plot")
+      title <- paste("Histogram for RSG: ", input$histogram_filter)
+      hist(hist_data(), breaks = input$bins, main = title, xlab=input$variable_response)
+    }, res = 96)
   }
   shinyApp(ui, server, ...)
 }
