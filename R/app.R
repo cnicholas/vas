@@ -6,6 +6,7 @@ library(stringr)
 library(shinyFeedback)
 library(TTR)
 
+qcc.options(bg.margin="white")
 
 vasApp <- function(...) {
   ui <- fluidPage(
@@ -26,23 +27,56 @@ vasApp <- function(...) {
 
       ),
       mainPanel(
-        tabsetPanel(id="tabset",
-                    tabPanel(value="tab_data",title = "Original Data",
-                             dataTableOutput("dataSummary")
-                    ),
-                    tabPanel(value="tab_rsg_data", title="Analysis Dataset",
-                            "The Analysis dataset excludes missing values and is sorted by rational subgroup and time",
-                            hr(),
-                            dataTableOutput("rsg_full")
-                    ),
-                    tabPanel(value="tab_data_stats", title="Summary Statistics"),
-                    tabPanel(value="tab_charts",title="Charts",
-                             selectInput("histogram_filter",label= "Rational Subgroup:",choices=NULL, multiple=FALSE),
-                             numericInput("bins", "Bins",25, min=1),
-                             plotOutput("hist"),
-                             textOutput("stuff"),
+        tabsetPanel(
+          id = "tabset",
+          tabPanel(
+            value = "tab_data",
+            title = "Original Data",
+            dataTableOutput("dataSummary")
+          ),
+          tabPanel(
+            value = "tab_rsg_data",
+            title = "Analysis Dataset",
+            "The Analysis dataset excludes missing values and is sorted by rational subgroup and time",
+            hr(),
+            dataTableOutput("rsg_full")
+          ),
+          tabPanel(
+            value = "tab_charts",
+            title = "Histograms",
+            selectInput(
+              "rsg_selected_hist",
+              label = "Rational Subgroup:",
+              choices = NULL,
+              multiple = FALSE
+            ),
+            numericInput("bins", "Bins", 25, min = 1),
+            plotOutput("hist"),
+            textOutput("stuff")
 
-                    )
+          ),
+          tabPanel(
+            value = "tab_IMR",
+            title = "Individuals Charts",
+            #Chart 1
+            selectInput(
+              "rsg_selected_imr1",
+              label = "Rational Subgroup:",
+              choices = NULL,
+              multiple = FALSE
+            ),
+            plotOutput("imr_chart1"),
+            hr(),
+            #Chart 2
+            selectInput(
+              "rsg_selected_imr2",
+              label = "Rational Subgroup:",
+              choices = NULL,
+              multiple = FALSE
+            ),
+            plotOutput("imr_chart2"),
+
+          )
         )
       )
     )
@@ -93,6 +127,7 @@ vasApp <- function(...) {
       updateSelectInput(session, "variable_rsg", choices = rsg_variable_choices, selected='')
     })
     observeEvent(input$variable_rsg,{
+      #should the choices be set when the RSG variable is changed
       message(paste("RSG defined: ", input$variable_rsg))
     })
 
@@ -129,60 +164,90 @@ vasApp <- function(...) {
                   "Mean (y)" = mean(!!response_symbol, na.rm=TRUE),
                   "sd (y)" = sd(!!response_symbol, na.rm=TRUE),
                   "Missing Values"=sum(is.na(!!response_symbol)))
+      #Refactor this out
+      choices<-full %>% distinct(!!rsg_meta$rsg_name_symbol)
+      choices<-c("All",choices)
+      updateSelectInput(session, "rsg_selected_hist", choices = choices, selected='All')
+      updateSelectInput(session, "rsg_selected_imr1", choices = choices, selected='All')
+      updateSelectInput(session, "rsg_selected_imr2", choices = choices, selected='All')
 
       list(summary=summary, full=full, meta=rsg_meta)
     })
 
-    observeEvent(input$histogram_filter,{
-      if(input$histogram_filter!='')
-        message(paste("filter value: ", input$histogram_filter))
+    observeEvent(input$rsg_selected_hist,{
+      if(input$rsg_selected_hist!='')
+        message(paste("filter value: ", input$rsg_selected_hist))
 
 
     })
 
-    histogramServer<- reactive({
-      message("histogramServer")
-      req(rsg_data()$full)
-
-      data<-rsg_data()$full
-      choices<-data %>% distinct(!!rsg_data()$meta$rsg_name_symbol)
-      choices<-c("All",choices)
-      updateSelectInput(session, "histogram_filter", choices = choices, selected='All')
-
-      ""
-    })
     hist_data <- reactive({
       req(rsg_data()$full)
       data <- rsg_data()$full
       message(typeof(data))
       response_sym <- sym(input$variable_response)
-      if (input$histogram_filter == 'All') {
+      if (input$rsg_selected_hist == 'All') {
         result <- data %>% select(!!rsg_data()$meta$response_symbol)
         return(result[[1]])
       } else{
         result <-
-          data %>% filter(!!rsg_data()$meta$rsg_name_symbol == input$histogram_filter) %>%
+          data %>% filter(!!rsg_data()$meta$rsg_name_symbol == input$rsg_selected_hist) %>%
           select(!!rsg_data()$meta$response_symbol)
         return(result[[1]])
       }
     })
+    create_imr<-function(rsg_data, rsg){
+      message(paste("***",rsg,"*** is the rsg"))
+      data<-rsg_data()$full
+      meta<-rsg_data()$meta
+
+      if (rsg == 'All') {
+        result <- data %>% select(!!meta$response_symbol)
+        return(result)
+      } else{
+        result <-data %>% filter(!!meta$rsg_name_symbol == rsg) %>%
+          select(!!meta$response_symbol)
+        return(result)
+      }
+    }
 
     disclaimer_msg<-reactive({
       req(rsg_data())
       if(sum(rsg_data()$summary$"Missing Values")>0)
         "Note: Missing values removed for calculation of the mean and standard deviation!"
     })
+
     output$rsg_stats <- renderTable(rsg_data()$summary)
     output$dataSummary <- renderDataTable(dataset())
     output$disclaimer <- renderText(disclaimer_msg())
     output$rsg_full <- renderDataTable(rsg_data()$full)
-    output$stuff <- renderText(histogramServer())
+    output$stuff <- renderText("histogramServer()")
     output$hist <- renderPlot({
-      req(input$histogram_filter)
+      req(input$rsg_selected_hist,rsg_data())
       message("in render plot")
-      title <- paste("Histogram for RSG: ", input$histogram_filter)
+      title <- paste("Histogram for RSG: ", input$rsg_selected_hist)
       hist(hist_data(), breaks = input$bins, main = title, xlab=input$variable_response)
     }, res = 96)
+    output$imr_chart1<-renderPlot({
+      qcc.options(bg.margin="white")
+      req(rsg_data(), input$rsg_selected_imr1)
+      message("built imr title1")
+      title<-paste("RSG",input$rsg_selected_imr1,sep=": ")
+      xlab<-paste("Time (t)",input$variable_time,sep=": ")
+      ylab<-input$variable_response
+
+      qcc(create_imr(rsg_data(),input$rsg_selected_imr1),type="xbar.one",xlab=xlab,ylab=ylab, title=title)
+    })
+    output$imr_chart2<-renderPlot({
+      qcc.options(bg.margin="white")
+      req(rsg_data(), input$rsg_selected_imr2)
+      message("built imr title2")
+      title<-paste("RSG",input$rsg_selected_imr2,sep=": ")
+      xlab<-paste("Time (t)",input$variable_time,sep=": ")
+      ylab<-input$variable_response
+
+      qcc(create_imr(rsg_data(),input$rsg_selected_imr2), type="xbar.one",xlab=xlab,ylab=ylab, title=title)
+    })
   }
   shinyApp(ui, server, ...)
 }
