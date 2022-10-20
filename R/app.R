@@ -4,7 +4,8 @@ library(dplyr)
 library(purrr)
 library(stringr)
 library(shinyFeedback)
-library(TTR)
+library(qcc)
+
 
 qcc.options(bg.margin="white")
 
@@ -151,9 +152,13 @@ vasApp <- function(...) {
 
       #Return a list of data frames 1 for summary and 1 with added columns
       #Build Rational Subgroup Fullset with RSG column
-      full <-dataset() %>%  mutate(!!rsg_name := paste(!!!rsg_col_symbols, sep="_")) %>%
+      full <-dataset() %>%
+
+        mutate(!!rsg_name := paste(!!!rsg_col_symbols, sep="_")) %>%
         filter(is.na(!!response_symbol)==FALSE) %>%
         arrange(!!rsg_name_symbol, !!time_symbol) %>%
+        mutate(ma=zoo::rollmean(!!response_symbol,2,fill=NA),
+               residual_ma=!!response_symbol-ma) %>%
         select(!!rsg_name_symbol,!!time_symbol,!!response_symbol, everything())
 
       #Build Rational Subgroup Summary
