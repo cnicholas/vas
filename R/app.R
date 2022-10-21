@@ -57,6 +57,12 @@ vasApp <- function(...) {
 
           ),
           tabPanel(
+            value = "tab_xbar",
+            title = "X-bar Charts",
+            #Chart 1
+            plotOutput("xbar_chart"),
+          ),
+          tabPanel(
             value = "tab_IMR",
             title = "Individuals Charts",
             #Chart 1
@@ -75,7 +81,7 @@ vasApp <- function(...) {
               choices = NULL,
               multiple = FALSE
             ),
-            plotOutput("imr_chart2"),
+            plotOutput("imr_chart2")
 
           )
         )
@@ -234,6 +240,7 @@ vasApp <- function(...) {
       hist(hist_data(), breaks = input$bins, main = title, xlab=input$variable_response)
     }, res = 96)
     output$imr_chart1<-renderPlot({
+
       qcc.options(bg.margin="white")
       req(rsg_data(), input$rsg_selected_imr1)
       message("built imr title1")
@@ -242,7 +249,7 @@ vasApp <- function(...) {
       ylab<-input$variable_response
 
       qcc(create_imr(rsg_data(),input$rsg_selected_imr1),type="xbar.one",xlab=xlab,ylab=ylab, title=title)
-    })
+    }, res = 96)
     output$imr_chart2<-renderPlot({
       qcc.options(bg.margin="white")
       req(rsg_data(), input$rsg_selected_imr2)
@@ -252,7 +259,26 @@ vasApp <- function(...) {
       ylab<-input$variable_response
 
       qcc(create_imr(rsg_data(),input$rsg_selected_imr2), type="xbar.one",xlab=xlab,ylab=ylab, title=title)
-    })
+
+
+    }, res = 96)
+    output$xbar_chart<-renderPlot({
+      req(rsg_data())
+      title<-paste("X-bar Chart for RSG", rsg_data()$meta$rsg_name, sep=": ")
+      xlab<-paste("Time (t)",input$variable_time,sep=": ")
+      ylab<-input$variable_response
+      message(paste(title, xlab, ylab,sep=", "))
+      data<-rsg_data()$full
+      meta<-rsg_data()$meta
+      var<-data %>% select(input$variable_response)
+      message(typeof(var[[1]]))
+      rsg<-data%>%select(meta$rsg_name)
+      message(paste(nrow(data), nrow(var), typeof(rsg),sep=", "))
+      #build chart
+      groups<-qcc.groups(var[[1]],rsg[[1]])
+      message(groups)
+      qcc(data = groups, type="xbar")
+    }, res = 96)
   }
   shinyApp(ui, server, ...)
 }
