@@ -7,9 +7,12 @@ library(shinyFeedback)
 library(qcc)
 
 
-qcc.options(bg.margin="white")
+
 
 vasApp <- function(...) {
+
+  qcc.options(bg.margin="white") #produce control charts with white background
+
   ui <- fluidPage(
     shinyFeedback::useShinyFeedback(),
     titlePanel("Variation Analysis System"),
@@ -91,6 +94,8 @@ vasApp <- function(...) {
 
   server <- function(input, output, session) {
 
+
+
     dataset<-reactive({
 
       req(input$datafile)
@@ -151,7 +156,9 @@ vasApp <- function(...) {
       rsg_col_symbols <- lapply(input$variable_rsg, as.symbol) #need for creating rsg column
       rsg_name <-paste0(input$variable_rsg,collapse="_") #for mutate label
       rsg_name_symbol<-sym(rsg_name)
+      response<-input$variable_response
       response_symbol<-sym(input$variable_response)
+      time<-input$variable_time
       time_symbol<- sym(input$variable_time)
       #create a list of meta data about analysis structure to use throughout the app
       rsg_meta<-mget(c("rsg_col_symbols","rsg_name","rsg_name_symbol","response_symbol","time_symbol"))
@@ -207,20 +214,7 @@ vasApp <- function(...) {
         return(result[[1]])
       }
     })
-    create_imr<-function(rsg_data, rsg){
-      message(paste("***",rsg,"*** is the rsg"))
-      data<-rsg_data()$full
-      meta<-rsg_data()$meta
 
-      if (rsg == 'All') {
-        result <- data %>% select(!!meta$response_symbol)
-        return(result)
-      } else{
-        result <-data %>% filter(!!meta$rsg_name_symbol == rsg) %>%
-          select(!!meta$response_symbol)
-        return(result)
-      }
-    }
 
     disclaimer_msg<-reactive({
       req(rsg_data())
@@ -241,43 +235,22 @@ vasApp <- function(...) {
     }, res = 96)
     output$imr_chart1<-renderPlot({
 
-      qcc.options(bg.margin="white")
       req(rsg_data(), input$rsg_selected_imr1)
-      message("built imr title1")
-      title<-paste("RSG",input$rsg_selected_imr1,sep=": ")
-      xlab<-paste("Time (t)",input$variable_time,sep=": ")
-      ylab<-input$variable_response
+      create_imr(rsg_data(),input$rsg_selected_imr1)
 
-      qcc(create_imr(rsg_data(),input$rsg_selected_imr1),type="xbar.one",xlab=xlab,ylab=ylab, title=title)
     }, res = 96)
+
     output$imr_chart2<-renderPlot({
-      qcc.options(bg.margin="white")
+
       req(rsg_data(), input$rsg_selected_imr2)
-      message("built imr title2")
-      title<-paste("RSG",input$rsg_selected_imr2,sep=": ")
-      xlab<-paste("Time (t)",input$variable_time,sep=": ")
-      ylab<-input$variable_response
-
-      qcc(create_imr(rsg_data(),input$rsg_selected_imr2), type="xbar.one",xlab=xlab,ylab=ylab, title=title)
-
+      create_imr(rsg_data(),input$rsg_selected_imr2)
 
     }, res = 96)
     output$xbar_chart<-renderPlot({
+
       req(rsg_data())
-      title<-paste("X-bar Chart for RSG", rsg_data()$meta$rsg_name, sep=": ")
-      xlab<-paste("Time (t)",input$variable_time,sep=": ")
-      ylab<-input$variable_response
-      message(paste(title, xlab, ylab,sep=", "))
-      data<-rsg_data()$full
-      meta<-rsg_data()$meta
-      var<-data %>% select(input$variable_response)
-      message(typeof(var[[1]]))
-      rsg<-data%>%select(meta$rsg_name)
-      message(paste(nrow(data), nrow(var), typeof(rsg),sep=", "))
-      #build chart
-      groups<-qcc.groups(var[[1]],rsg[[1]])
-      message(groups)
-      qcc(data = groups, type="xbar")
+      create_xbar(rsg_data())
+
     }, res = 96)
   }
   shinyApp(ui, server, ...)
