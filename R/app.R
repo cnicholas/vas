@@ -49,16 +49,23 @@ vasApp <- function(...) {
             value = "tab_charts",
             title = "Histograms",
             selectInput(
-              "rsg_selected_hist",
+              "rsg_selected_hist1",
               label = "Rational Subgroup:",
               choices = NULL,
               multiple = FALSE
             ),
-            numericInput("bins", "Bins", 25, min = 1),
-            plotOutput("hist"),
-            textOutput("stuff")
-
-          ),
+            numericInput("bins1", "Bins", 25, min = 1),
+            plotOutput("hist1"),
+            hr(),
+            selectInput(
+              "rsg_selected_hist2",
+              label = "Rational Subgroup:",
+              choices = NULL,
+              multiple = FALSE
+            ),
+            numericInput("bins2", "Bins", 25, min = 1),
+            plotOutput("hist2")
+             ),
           tabPanel(
             value = "tab_xbar",
             title = "X-bar Charts",
@@ -185,7 +192,8 @@ vasApp <- function(...) {
       #Refactor this out
       choices<-full %>% distinct(!!rsg_meta$rsg_name_symbol)
       choices<-c("All",choices)
-      updateSelectInput(session, "rsg_selected_hist", choices = choices, selected='All')
+      updateSelectInput(session, "rsg_selected_hist1", choices = choices, selected='All')
+      updateSelectInput(session, "rsg_selected_hist2", choices = choices, selected='All')
       updateSelectInput(session, "rsg_selected_imr1", choices = choices, selected='All')
       updateSelectInput(session, "rsg_selected_imr2", choices = choices, selected='All')
 
@@ -226,12 +234,20 @@ vasApp <- function(...) {
     output$dataSummary <- renderDataTable(dataset())
     output$disclaimer <- renderText(disclaimer_msg())
     output$rsg_full <- renderDataTable(rsg_data()$full)
-    output$stuff <- renderText("histogramServer()")
-    output$hist <- renderPlot({
-      req(input$rsg_selected_hist,rsg_data())
-      message("in render plot")
-      title <- paste("Histogram for RSG: ", input$rsg_selected_hist)
-      hist(hist_data(), breaks = input$bins, main = title, xlab=input$variable_response)
+
+    output$hist1 <- renderPlot({
+      message("output plot hist1")
+      req(input$rsg_selected_hist1,rsg_data())
+      message("at create hist function call")
+      create_hist(rsg_data(), input$rsg_selected_hist1, bins=input$bins1)
+
+    }, res = 96)
+    output$hist2 <- renderPlot({
+      message("output plot hist2")
+      req(input$rsg_selected_hist2,rsg_data())
+      message("at create hist function call")
+      create_hist(rsg_data(), input$rsg_selected_hist2, bins=input$bins2)
+
     }, res = 96)
     output$imr_chart1<-renderPlot({
 
@@ -243,7 +259,8 @@ vasApp <- function(...) {
     output$imr_chart2<-renderPlot({
 
       req(rsg_data(), input$rsg_selected_imr2)
-      create_imr(rsg_data(),input$rsg_selected_imr2)
+      chart<-create_imr(rsg_data(),input$rsg_selected_imr2)
+
 
     }, res = 96)
     output$xbar_chart<-renderPlot({

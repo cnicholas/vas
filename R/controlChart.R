@@ -13,7 +13,7 @@ create_xbar<- function(rsg_data){
   #build chart
   groups<-qcc.groups(var ,rsg)
   qcc.options(bg.margin="white") #produce control charts with white background
-  qcc(data = groups, type="xbar")
+  qcc(data = groups, type="xbar", title=title, ylab=ylab, xlab=xlab)
 
 }
 
@@ -35,7 +35,7 @@ create_imr<-function(rsg_data, rsg_selected="All"){
       select(meta$response)
   }
   qcc.options(bg.margin="white") #produce control charts with white background
-  qcc(result,type="xbar.one",xlab=xlab,ylab=ylab, title=title)
+  cc_chart<-qcc(result,type="xbar.one",xlab=xlab,ylab=ylab, title=title)
 }
 
 
