@@ -1,7 +1,9 @@
 create_xbar<- function(rsg_data){
 
-  data<-rsg_data$full
   meta<-rsg_data$meta
+  #Remove Groups with 1 observation
+
+  data<-rsg_data$full%>%group_by(!!meta$rsg_name_symbol)%>%filter(n()>1)%>%ungroup() #added ungroup() to eliminate the "add variable" warning
 
   title<-paste("X-bar Chart for RSG", meta$rsg_name, sep=": ")
   xlab<-paste("Rational Subgroups",meta$rsg_name, sep=": ")
@@ -13,7 +15,7 @@ create_xbar<- function(rsg_data){
   #build chart
   groups<-qcc.groups(var ,rsg)
   qcc.options(bg.margin="white") #produce control charts with white background
-  qcc(data = groups, type="xbar", title=title, ylab=ylab, xlab=xlab)
+  qcc(data = groups, type="xbar", title=title, ylab=ylab, xlab=xlab,)
 
 }
 

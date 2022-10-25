@@ -10,7 +10,7 @@ library(qcc)
 
 
 vasApp <- function(...) {
-
+  options(shiny.maxRequestSize = 15 * 1024^2)
   qcc.options(bg.margin="white") #produce control charts with white background
 
   ui <- fluidPage(
@@ -19,7 +19,7 @@ vasApp <- function(...) {
     sidebarLayout(
       sidebarPanel(
 
-        fileInput("datafile",label = "Select a file to analyze", accept = c(".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
+        fileInput("datafile",label = "Select a file to analyze", accept = c(".csv",".txt",".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
         tableOutput("datafilestats"),
         selectInput("variable_response",label = "Response Variable (y):", choices=NULL),
         selectInput("variable_time",label = "Time Dimension (t):", choices=NULL),
@@ -104,22 +104,29 @@ vasApp <- function(...) {
 
 
     dataset<-reactive({
+      message("dataset1")
 
       req(input$datafile)
-
       inputFile<-input$datafile
+      ext <- tools::file_ext(inputFile$datapath)
+
+      message("dataset2")
+      validate(need(ext %in% c("csv","txt","xls","xlsx"), "Please upload a csv, txt, xls, or xlsx file"))
 
       loadDataSet(inputFile$datapath)
 
     })
+    #Build file summary in left panel
     output$datafilestats<-renderTable(dataset()%>%summarize(Observations=n(), Variables=ncol(.), "Missing Values"=sum(is.na(.))))
 
     observeEvent(input$datafile, {
-      message("in input_file ObserveEvent")
+
       req(dataset())
-      message(paste("Column names are: ",names(dataset())))
-      response_choices <- get_choices(names(dplyr::select_if(dataset(), is.numeric)))
+      #Grab numeric columns for response variable
+      col_names<- str_sort(names(dplyr::select_if(dataset(), is.numeric)))
+      response_choices <- get_choices(col_names)
       updateSelectInput(session, "variable_response", choices = response_choices, selected='') #set selected to '' to avoid triggering observe
+
     })
     #GET Analysis structure defined
     get_choices<-function(choices, selected=c("")){
@@ -129,8 +136,8 @@ vasApp <- function(...) {
     observeEvent(input$variable_response, {
       if(input$variable_response !='')
         message(paste("Observing variable_response changes: ", input$variable_response))
-
-      time_variable_choices<-get_choices(names(dataset()),input$variable_response)
+      col_names<- str_sort(names(dataset()))
+      time_variable_choices<-get_choices(col_names,input$variable_response)
       message(time_variable_choices)
       updateSelectInput(session, "variable_time", choices = time_variable_choices, selected='')
 
@@ -140,8 +147,8 @@ vasApp <- function(...) {
       if(input$variable_time !='')
         message(paste("Observing variable_time changes: ", input$variable_time))
       #filter remaining variable by y and t to populate options for rsg variables
-
-      rsg_variable_choices<-get_choices(names(dataset()),c(input$variable_response,input$variable_time))
+      col_names<- str_sort(names(dataset()))
+      rsg_variable_choices<-get_choices(col_names,c(input$variable_response,input$variable_time))
       message(rsg_variable_choices)
       updateSelectInput(session, "variable_rsg", choices = rsg_variable_choices, selected='')
     })
