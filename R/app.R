@@ -279,3 +279,4 @@ vasApp <- function(...) {
   }
   shinyApp(ui, server, ...)
 }
+vasApp()
