@@ -7,9 +7,9 @@ library(qcc)
 
 wd<-getwd()
 
-source(paste(wd,"loadData.R",sep="/"), local = TRUE)
-source(paste(wd,"controlChart.R",sep="/"), local = TRUE)
-source(paste(wd,"histogram.R",sep="/"), local = TRUE)
+# source(paste(wd,"loadData.R",sep="/"), local = TRUE)
+# source(paste(wd,"controlChart.R",sep="/"), local = TRUE)
+# source(paste(wd,"histogram.R",sep="/"), local = TRUE)
 
 vasApp <- function(...) {
   options(shiny.maxRequestSize = 15 * 1024^2)
@@ -21,7 +21,13 @@ vasApp <- function(...) {
     sidebarLayout(
       sidebarPanel(
 
-        fileInput("datafile",label = "Select a file to analyze", accept = c(".csv",".tsv",".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
+        fileInput("datafile",label = "Select a file to analyze", accept = c(".txt",".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
+        selectInput("file_type", label="File Type:", choices=c("txt","Excel"), selected=""),
+        checkboxInput("has_headers", label="Has Column Names", value=TRUE),
+        selectInput("file_delimiter", label="Delimiter:", choices=c("tab","comma","pipe")),
+        selectInput("wkb_sheets", label="Worksheets:", choices=NULL),
+        textOutput("filestatus"),
+        tags$hr(),
         tableOutput("datafilestats"),
         selectInput("variable_response",label = "Response Variable (y):", choices=NULL),
         selectInput("variable_time",label = "Time Dimension (t):", choices=NULL),
@@ -104,15 +110,13 @@ vasApp <- function(...) {
   server <- function(input, output, session) {
 
 
-
     dataset<-reactive({
-      message("dataset1")
-
+    #Raw data upload
       req(input$datafile)
       inputFile<-input$datafile
       ext <- tools::file_ext(inputFile$datapath)
-
-      message("dataset2")
+      message("Raw")
+      message(ext)
       validate(need(ext %in% c("csv","txt","xls","xlsx"), "Please upload a csv, txt, xls, or xlsx file"))
 
       loadDataSet(inputFile$datapath)
@@ -159,7 +163,7 @@ vasApp <- function(...) {
       message(paste("RSG defined: ", input$variable_rsg))
     })
 
-
+    #Refactor this code out.
     rsg_data<- reactive({
       if(input$analyze==0)
         return(NULL)
@@ -216,29 +220,12 @@ vasApp <- function(...) {
 
     })
 
-    hist_data <- reactive({
-      req(rsg_data()$full)
-      data <- rsg_data()$full
-      message(typeof(data))
-      response_sym <- sym(input$variable_response)
-      if (input$rsg_selected_hist == 'All') {
-        result <- data %>% select(!!rsg_data()$meta$response_symbol)
-        return(result[[1]])
-      } else{
-        result <-
-          data %>% filter(!!rsg_data()$meta$rsg_name_symbol == input$rsg_selected_hist) %>%
-          select(!!rsg_data()$meta$response_symbol)
-        return(result[[1]])
-      }
-    })
-
-
-    disclaimer_msg<-reactive({
+   disclaimer_msg<-reactive({
       req(rsg_data())
       if(sum(rsg_data()$summary$"Missing Values")>0)
         "Note: Missing values removed for calculation of the mean and standard deviation!"
     })
-
+    output$filestatus<-renderText("raw()")
     output$rsg_stats <- renderTable(rsg_data()$summary)
     output$dataSummary <- renderDataTable(dataset())
     output$disclaimer <- renderText(disclaimer_msg())
