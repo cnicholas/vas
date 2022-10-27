@@ -1,0 +1,13 @@
+name: vasApp
+title: vasApp
+username:
+account: bacg
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 7415282
+bundleId: 6439863
+url: https://bacg.shinyapps.io/vasApp/
+when: 1666717450.9857
+lastSyncTime: 1666717450.98571
+asMultiple: FALSE
+asStatic: FALSE

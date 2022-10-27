@@ -8,6 +8,15 @@ library(qcc)
 
 
 
+wd<-getwd()
+
+source(paste(wd,"loadData.R",sep="/"), local = TRUE)
+source(paste(wd,"controlChart.R",sep="/"), local = TRUE)
+source(paste(wd,"histogram.R",sep="/"), local = TRUE)
+
+
+
+
 
 vasApp <- function(...) {
   options(shiny.maxRequestSize = 15 * 1024^2)
@@ -19,7 +28,7 @@ vasApp <- function(...) {
     sidebarLayout(
       sidebarPanel(
 
-        fileInput("datafile",label = "Select a file to analyze", accept = c(".csv",".txt",".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
+        fileInput("datafile",label = "Select a file to analyze", accept = c(".csv",".tsv",".xls",".xlsx"), multiple = FALSE, buttonLabel = "Choose File"),
         tableOutput("datafilestats"),
         selectInput("variable_response",label = "Response Variable (y):", choices=NULL),
         selectInput("variable_time",label = "Time Dimension (t):", choices=NULL),
