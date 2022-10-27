@@ -3,10 +3,7 @@ library(readxl)
 library(dplyr)
 library(purrr)
 library(stringr)
-library(shinyFeedback)
 library(qcc)
-
-
 
 wd<-getwd()
 
@@ -14,16 +11,12 @@ source(paste(wd,"loadData.R",sep="/"), local = TRUE)
 source(paste(wd,"controlChart.R",sep="/"), local = TRUE)
 source(paste(wd,"histogram.R",sep="/"), local = TRUE)
 
-
-
-
-
 vasApp <- function(...) {
   options(shiny.maxRequestSize = 15 * 1024^2)
   qcc.options(bg.margin="white") #produce control charts with white background
 
   ui <- fluidPage(
-    shinyFeedback::useShinyFeedback(),
+
     titlePanel("Variation Analysis System"),
     sidebarLayout(
       sidebarPanel(
