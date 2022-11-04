@@ -7,12 +7,16 @@ library(qcc)
 
 wd<-getwd()
 
-# source(paste(wd,"loadData.R",sep="/"), local = TRUE)
-# source(paste(wd,"controlChart.R",sep="/"), local = TRUE)
-# source(paste(wd,"histogram.R",sep="/"), local = TRUE)
+ source(paste(wd,"loadData.R",sep="/"), local = TRUE)
+ source(paste(wd,"controlChart.R",sep="/"), local = TRUE)
+ source(paste(wd,"histogram.R",sep="/"), local = TRUE)
+ source(paste(wd,"loadData.R",sep="/"), local = TRUE)
+
 
 vasApp <- function(...) {
+
   options(shiny.maxRequestSize = 15 * 1024^2)
+
   qcc.options(bg.margin="white") #produce control charts with white background
 
   ui <- fluidPage(
@@ -28,9 +32,9 @@ vasApp <- function(...) {
                    tags$hr(),
 
                    tableOutput("datafilestats"),
-                   selectInput("variable_response",label = "Response Variable (y):", choices=NULL, selected=NULL),
-                   selectInput("variable_time",label = "Time Dimension (t):", choices=NULL),
-                   selectInput("variable_rsg",label = "RSG Variables (x):", choices=NULL, multiple = TRUE),
+                   selectizeInput("variable_response",label = "Response Variable (y):", choices=NULL, multiple = TRUE, selected=NULL, options = list(maxItems = 1)),
+                   selectizeInput("variable_time",label = "Time Dimension (t):", choices=NULL, multiple = TRUE, selected=NULL, options = list(maxItems = 1)),
+                   selectizeInput("variable_rsg",label = "RSG Variables (x):", choices=NULL, multiple = TRUE, selected=NULL, options = list(maxItems = 5)),
                    actionButton("analyze",label = "Analyze"),
                    hr(),
                    tableOutput("rsg_stats")
@@ -42,16 +46,10 @@ vasApp <- function(...) {
                   id = "tabset",
                   tabPanel(
                     value = "tab_data",
-                    title = "Original Data",
+                    title = "Data",
                     dataTableOutput("dataSummary")
                   ),
-                  tabPanel(
-                    value = "tab_rsg_data",
-                    title = "Analysis Dataset",
-                    "The Analysis dataset excludes missing values and is sorted by rational subgroup and time",
-                    hr(),
-                    dataTableOutput("rsg_full")
-                  ),
+
                   tabPanel(
                     value = "tab_charts",
                     title = "Histograms",
@@ -111,7 +109,7 @@ vasApp <- function(...) {
 
     get_choices<-function(choices, selected=c("")){
 
-      choices[!choices%in%selected]
+      str_sort(choices[!choices%in%selected])
     }
     is_default_selection<-function(selection){
 
@@ -120,11 +118,9 @@ vasApp <- function(...) {
 
     observeEvent(input$file, {
 
-      updateSelectInput(session, "variable_response", choices ='', selected='')
-      updateSelectInput(session, "variable_time", choices ='', selected='')
-      updateSelectInput(session, "variable_rsg", choices ='', selected='')
-
-
+      updateSelectizeInput(session, "variable_response", choices ='', selected=character(0))
+      updateSelectizeInput(session, "variable_time", choices ='', selected=character(0))
+      updateSelectizeInput(session, "variable_rsg", choices ='', selected=character(0))
 
       file<-input$file
 
@@ -137,19 +133,27 @@ vasApp <- function(...) {
         rv$is_excel<-TRUE
         choices <- get_choices(sheets)
         choices<-cbind(c("Choose a worksheet!"), choices)
-        updateSelectInput(session, "file_input", choices = choices) #set selected to '' to avoid triggering observe
+        updateSelectizeInput(session, "file_input", choices = choices) #set selected to '' to avoid triggering observe
       }else{
         rv$is_excel<-FALSE
         choices<-c("Comma","Tab","Pipe")
         choices<-cbind(c("Choose a delimiter!"), choices)
-        updateSelectInput(session, "file_input", choices = choices)
+        updateSelectizeInput(session, "file_input", choices = choices)
       }
 
     })
      observeEvent(input$btn_load_data, {
 
-      #req(input$file, input$btn_load_data, input$file_input, input$has_headers)
+       rv$dataset=data.frame()
+       rv$summary=data.frame()
+       rv$meta=list()
 
+       updateSelectizeInput(session, "variable_response", choices ='', selected='')
+       updateSelectizeInput(session, "variable_time", choices ='', selected='')
+       updateSelectizeInput(session, "variable_rsg", choices ='', selected='')
+
+      #req(input$file, input$btn_load_data, input$file_input, input$has_headers)
+       message(paste("in btn_load_data, val of variable response:", input$variable_response, sep=""))
 
       file <- input$file
       header<-input$has_headers
@@ -176,28 +180,32 @@ vasApp <- function(...) {
       col_names<- names(dplyr::select_if(data, is.numeric))
 
       response_choices <- get_choices(col_names)
-      updateSelectInput(session, "variable_response", choices = response_choices, selected='')
+      updateSelectizeInput(session, "variable_response", choices = response_choices, selected='')
     })
 
     observeEvent(input$variable_response, {
-
+      response=input$variable_response
       data<-rv$dataset
+      message(paste("in response value is:[[",response,"]]", sep=""))
 
-      if(input$variable_response!= ''){
+
         col_names<-names(data)
-        time_variable_choices<-get_choices(col_names,input$variable_response)
-        updateSelectInput(session, "variable_time", choices = time_variable_choices, selected='')
-        updateSelectInput(session, "variable_rsg", choices = character(0), selected='')
-      }
+        time_variable_choices<-get_choices(col_names, response)
+        updateSelectizeInput(session, "variable_time", choices = time_variable_choices, selected='')
+        updateSelectizeInput(session, "variable_rsg", choices = '', selected='')
+
     })
     #set choices parameters (control, selected_variables<character vector) returns vector of choices
     observeEvent(input$variable_time, {
-
+      req(input$variable_response)
+      response=input$variable_response
+      time=input$variable_time
+      message(paste("in time value is:[[",time,"]]", sep=""))
       data<-rv$dataset
-      if(input$variable_time !=''){
+      if(time !=''){
       col_names<- names(data)
-      rsg_variable_choices<-get_choices(col_names,c(input$variable_response,input$variable_time))
-      updateSelectInput(session, "variable_rsg", choices = rsg_variable_choices, selected='')
+      rsg_variable_choices<-get_choices(col_names,c(response, time))
+      updateSelectizeInput(session, "variable_rsg", choices = rsg_variable_choices, selected='')
       }
     })
 
@@ -210,7 +218,7 @@ vasApp <- function(...) {
       #need to create symbols to do dynamic calculations
       #rsg is a list
       rsg_col_symbols <- lapply(input$variable_rsg, as.symbol) #need for creating rsg column
-      rsg_name <-paste0(input$variable_rsg,collapse="_") #for mutate label
+      rsg_name <-"rsg" #paste0(input$variable_rsg,collapse="_") #for mutate label
       rsg_name_symbol<-sym(rsg_name)
       response<-input$variable_response
       response_symbol<-sym(input$variable_response)
@@ -226,8 +234,8 @@ vasApp <- function(...) {
         mutate(!!rsg_name := paste(!!!rsg_col_symbols, sep="_")) %>%
         filter(is.na(!!response_symbol)==FALSE) %>%
         arrange(!!rsg_name_symbol, !!time_symbol) %>%
-        mutate(ma=zoo::rollmean(!!response_symbol,2,fill=NA),
-               residual_ma=!!response_symbol-ma) %>%
+        #mutate(ma=zoo::rollmean(!!response_symbol,2,fill=NA),
+              # residual_ma=!!response_symbol-ma) %>%
         select(!!rsg_name_symbol,!!time_symbol,!!response_symbol, everything())
 
       #Build Rational Subgroup Summary
@@ -261,23 +269,18 @@ vasApp <- function(...) {
     })
 
     output$rsg_stats <- renderTable({
-      req(rv$dataset)
-      rv$summary})
+      rv$summary
+      })
 
      output$dataSummary <- renderDataTable({
                                             rv$dataset
                                            })
     output$disclaimer <- renderText(disclaimer_msg())
-    output$rsg_full <- renderDataTable({
-
-      rv$dataset
-
-    })
 
     output$hist1 <- renderPlot({
 
       req(input$rsg_selected_hist1)
-
+      if(length(rv$meta)>0)
       create_hist(rv$dataset,rv$meta,input$rsg_selected_hist1, bins=input$bins1)
 
     }, res = 96)
@@ -285,30 +288,42 @@ vasApp <- function(...) {
     output$hist2 <- renderPlot({
       message("output plot hist2")
       req(input$rsg_selected_hist2)
-      message("at create hist function call")
+      if(length(rv$meta)>0)
       create_hist(rv$dataset,rv$meta, input$rsg_selected_hist2, bins=input$bins2)
 
     }, res = 96)
-  #   output$imr_chart1<-renderPlot({
-  #
-  #     req(rsg_data(), input$rsg_selected_imr1)
-  #     create_imr(rsg_data(),input$rsg_selected_imr1)
-  #
-  #   }, res = 96)
-  #
-  #   output$imr_chart2<-renderPlot({
-  #
-  #     req(rsg_data(), input$rsg_selected_imr2)
-  #     chart<-create_imr(rsg_data(),input$rsg_selected_imr2)
-  #
-  #
-  #   }, res = 96)
-  #   output$xbar_chart<-renderPlot({
-  #
-  #     req(rsg_data())
-  #     create_xbar(rsg_data())
-  #
-  #   }, res = 96)
+    output$imr_chart1<-renderPlot({
+
+      req(rv$dataset,rv$meta, input$rsg_selected_imr1)
+      data<-rv$dataset
+      meta<-rv$meta
+
+      if(length(meta)>0)
+      create_imr(data,meta,input$rsg_selected_imr1)
+
+    }, res = 96)
+
+    output$imr_chart2<-renderPlot({
+
+      req(rv$dataset,rv$meta, input$rsg_selected_imr2)
+
+      data<-rv$dataset
+      meta<-rv$meta
+
+      if(length(meta)>0)
+      chart<-create_imr(data, meta, input$rsg_selected_imr2)
+
+
+    }, res = 96)
+    output$xbar_chart<-renderPlot({
+
+      req(rv$dataset)
+      data<-rv$dataset
+      meta<-rv$meta
+      if(length(meta)>0)
+      create_xbar(data,meta)
+
+    }, res = 96)
    }
   shinyApp(ui, server, ...)
 }

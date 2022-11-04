@@ -1,9 +1,9 @@
-create_xbar<- function(rsg_data){
+create_xbar<- function(data,meta){
 
-  meta<-rsg_data$meta
+  meta<-meta
   #Remove Groups with 1 observation
 
-  data<-rsg_data$full%>%group_by(!!meta$rsg_name_symbol)%>%filter(n()>1)%>%ungroup() #added ungroup() to eliminate the "add variable" warning
+  data<-data%>%group_by(!!meta$rsg_name_symbol)%>%filter(n()>1)%>%ungroup() #added ungroup() to eliminate the "add variable" warning
 
   title<-paste("X-bar Chart for RSG", meta$rsg_name, sep=": ")
   xlab<-paste("Rational Subgroups",meta$rsg_name, sep=": ")
@@ -19,15 +19,14 @@ create_xbar<- function(rsg_data){
 
 }
 
-create_imr<-function(rsg_data, rsg_selected="All"){
+create_imr<-function(data,meta, rsg_selected="All"){
 
-  data<-rsg_data$full
-  meta<-rsg_data$meta
+  data<-data
+  meta<-meta
 
   title<-paste("RSG", rsg_selected, sep=": ")
   xlab<-paste("Time (t)", meta$time, sep=": ")
   ylab<-meta$response
-
 
   if (rsg_selected == 'All') {
     result <- data %>% select(meta$response)
