@@ -1,10 +1,9 @@
 
 
-create_hist <- function(rsg_data,
+create_hist <- function(data, meta,
                         rsg_selected = "All",
                         bins = 25) {
-  data <- rsg_data$full
-  meta <- rsg_data$meta
+
   message("In create_hist")
   if (rsg_selected == 'All') {
     hist_data <- data %>% select(!!meta$response_symbol) %>% pull()

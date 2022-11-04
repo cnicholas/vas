@@ -21,6 +21,14 @@ loadDataSet<- function(datapath){
   }
 }
 
+loadDataExcel<- function(datapath, sheet="data", headers=TRUE){
+  out<-readxl::read_xlsx(datapath,sheet=sheet,col_names = headers)
+}
+
+loadDataText<- function(datapath, delim="",headers=TRUE){
+  out<-vroom::vroom(datapath, delim = ",", col_names = headers, show_col_types = FALSE)
+}
+
 handling_excel<-function(datapath){
 
   #wkb <- readxl::read_xlsx(datapath)
